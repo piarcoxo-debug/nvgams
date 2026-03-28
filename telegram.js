@@ -1,16 +1,8 @@
-window.NovaTelegram = {
-  init() {
-    const tg = window.Telegram && window.Telegram.WebApp;
-    if (!tg) return null;
-    try {
-      tg.ready();
-      tg.expand();
-      tg.setHeaderColor('#14083e');
-      tg.setBackgroundColor('#09051d');
-      return tg;
-    } catch (err) {
-      console.warn('Telegram WebApp init failed', err);
-      return null;
-    }
-  }
-};
+(() => {
+  const tg = window.Telegram && window.Telegram.WebApp;
+  if (!tg) return;
+  tg.ready();
+  try { tg.expand(); } catch {}
+  try { tg.setHeaderColor('#14063d'); } catch {}
+  try { tg.setBackgroundColor('#08011e'); } catch {}
+})();

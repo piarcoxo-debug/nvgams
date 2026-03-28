@@ -5,57 +5,57 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Nova Rush</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="styles.css?v=final1" />
+  <link rel="stylesheet" href="styles.css?v=final2" />
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
   <div class="app-shell">
     <div class="game-card">
       <header class="topbar">
-        <div class="brand-block panel">
-          <div class="brand">NOVA RUSH</div>
-          <div class="brand-badges">
-            <span id="gameStateBadge" class="badge badge-idle">Ожидание</span>
-            <span class="badge badge-limit">Макс. 50.00x</span>
+        <div class="logo-box panel">
+          <div class="brand">NOVA<br>RUSH</div>
+          <div class="badge-row">
+            <span id="gameStateBadge" class="chip chip-idle">Ожидание</span>
+            <span class="chip chip-limit">Макс. 50.00x</span>
           </div>
         </div>
 
-        <div class="readout-block panel panel-transparent">
+        <div class="center-box">
           <div id="multiplier" class="multiplier">1.00x</div>
           <div id="statusText" class="status-text">Нажми «Старт»</div>
         </div>
 
-        <div class="stats-grid">
-          <div class="balance-box panel compact-panel">
-            <span class="label">Баланс</span>
-            <strong id="balance">10 000 монет</strong>
+        <div class="side-boxes">
+          <div class="side-box panel balance-box">
+            <div class="side-label">Баланс</div>
+            <div id="balance" class="balance-value">10 000 монет</div>
           </div>
-          <div class="history-box panel compact-panel">
-            <span class="label">Последние раунды</span>
+          <div class="side-box panel history-box">
+            <div class="side-label">Последние раунды</div>
             <div id="historyList" class="history-list"></div>
           </div>
         </div>
       </header>
 
-      <main class="scene-wrap" id="sceneWrap">
+      <main id="sceneWrap" class="scene-wrap">
         <div class="parallax city-back"></div>
         <canvas id="trailCanvas" class="trail-canvas"></canvas>
         <div id="sparkLayer" class="spark-layer"></div>
         <div id="explosion" class="explosion hidden"></div>
         <div id="pilot" class="pilot"></div>
         <div class="parallax city-front"></div>
-        <div class="ground-line"></div>
+        <div class="ground-glow"></div>
       </main>
 
-      <footer class="control-bar">
+      <footer class="controls">
         <div class="bet-panel panel">
-          <label for="betInput">Ставка</label>
-          <div class="bet-row">
+          <div class="bet-label">Ставка</div>
+          <div class="bet-main-row">
             <button id="minusBtn" type="button" class="mini-btn">-50</button>
             <input id="betInput" type="number" inputmode="numeric" min="10" step="10" value="100" />
             <button id="plusBtn" type="button" class="mini-btn">+50</button>
           </div>
-          <div class="bet-presets">
+          <div class="preset-row">
             <button type="button" class="preset-btn" data-bet="100">100</button>
             <button type="button" class="preset-btn" data-bet="500">500</button>
             <button type="button" class="preset-btn" data-bet="1000">1000</button>
@@ -72,8 +72,8 @@
     </div>
   </div>
 
-  <script src="config.js?v=final1"></script>
-  <script src="telegram.js?v=final1"></script>
-  <script src="app.js?v=final1"></script>
+  <script src="config.js?v=final2"></script>
+  <script src="telegram.js?v=final2"></script>
+  <script src="app.js?v=final2"></script>
 </body>
 </html>
