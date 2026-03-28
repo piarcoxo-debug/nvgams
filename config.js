@@ -1,23 +1,18 @@
-window.NOVA_CONFIG = {
+window.NovaRushConfig = {
+  appName: 'NOVA RUSH',
   currencyName: 'монет',
   startBalance: 10000,
   defaultBet: 100,
-  minBet: 10,
-  maxBet: 1000000,
   maxCrash: 50,
-  historySize: 6,
-  storageKey: 'novarush_true_final_state',
-  crashDistribution: [
-    { chance: 40, min: 1.0, max: 2.0 },
-    { chance: 30, min: 2.01, max: 5.0 },
-    { chance: 15, min: 5.01, max: 10.0 },
-    { chance: 10, min: 10.01, max: 20.0 },
-    { chance: 4, min: 20.01, max: 35.0 },
-    { chance: 1, min: 35.01, max: 50.0 }
+  historySize: 10,
+  quickBets: [100, 500, 1000, 5000, 10000],
+  crashRanges: [
+    { min: 1.0, max: 2.0, weight: 40 },
+    { min: 2.01, max: 5.0, weight: 30 },
+    { min: 5.01, max: 10.0, weight: 15 },
+    { min: 10.01, max: 20.0, weight: 10 },
+    { min: 20.01, max: 35.0, weight: 4 },
+    { min: 35.01, max: 50.0, weight: 1 }
   ],
-  minRoundDurationMs: 1200,
-  maxRoundDurationMs: 6200,
-  fallDurationMs: 380,
-  postCrashResetMs: 720,
-  postCashoutResetMs: 450
+  cacheVersion: 'phone-final-1'
 };
