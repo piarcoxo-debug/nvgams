@@ -1,50 +1,50 @@
+
 (() => {
   const cfg = window.NOVA_CONFIG;
-  const tg = window.NovaTelegram ? window.NovaTelegram.init() : null;
+  const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+  if (tg) {
+    tg.ready();
+    tg.expand();
+  }
 
   const ui = {
-    balance: document.getElementById('balance'),
+    badge: document.getElementById('gameStateBadge'),
     multiplier: document.getElementById('multiplier'),
     statusText: document.getElementById('statusText'),
+    balance: document.getElementById('balance'),
     historyList: document.getElementById('historyList'),
-    badge: document.getElementById('gameStateBadge'),
+    scene: document.getElementById('sceneWrap'),
+    pilot: document.getElementById('pilot'),
+    trailCanvas: document.getElementById('trailCanvas'),
+    sparkLayer: document.getElementById('sparkLayer'),
+    explosion: document.getElementById('explosion'),
     betInput: document.getElementById('betInput'),
     minusBtn: document.getElementById('minusBtn'),
     plusBtn: document.getElementById('plusBtn'),
     startBtn: document.getElementById('startBtn'),
-    cashoutBtn: document.getElementById('cashoutBtn'),
-    scene: document.querySelector('.scene-wrap'),
-    pilot: document.getElementById('pilot'),
-    trailCanvas: document.getElementById('trailCanvas'),
-    sparkLayer: document.getElementById('sparkLayer'),
-    explosion: document.getElementById('explosion')
+    cashoutBtn: document.getElementById('cashoutBtn')
   };
 
   const state = {
     balance: cfg.startBalance,
     currentBet: cfg.defaultBet,
-    history: [],
-    gameState: 'idle',
     currentMultiplier: 1,
-    crashPoint: null,
-    startAt: 0,
-    lastFrame: 0,
-    rafId: 0,
+    crashPoint: 1,
+    gameState: 'idle',
+    history: [],
     path: [],
+    rafId: 0,
+    roundDuration: 0,
+    startAt: 0,
     cashedOut: false,
-    roundDuration: 3000,
-    pendingCrashTimeout: null,
-    particlesTimer: null
+    resetTimer: 0
   };
 
-  function clamp(value, min, max) {
-    return Math.max(min, Math.min(max, value));
-  }
-
-  function toNum(value, fallback) {
+  const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+  const toNum = (value, fallback) => {
     const n = Number(value);
     return Number.isFinite(n) ? n : fallback;
-  }
+  };
 
   function saveState() {
     try {
@@ -65,19 +65,17 @@
       const parsed = JSON.parse(raw);
       state.balance = clamp(Math.floor(toNum(parsed.balance, cfg.startBalance)), 0, 10_000_000);
       state.currentBet = clamp(Math.floor(toNum(parsed.currentBet, cfg.defaultBet)), cfg.minBet, cfg.maxBet);
-      state.history = Array.isArray(parsed.history) ? parsed.history.filter(v => Number.isFinite(v)).slice(0, cfg.historySize) : [];
+      state.history = Array.isArray(parsed.history)
+        ? parsed.history.filter(v => Number.isFinite(v)).slice(0, cfg.historySize)
+        : [];
     } catch (err) {
-      console.warn('Bad saved data, reset to defaults');
       state.balance = cfg.startBalance;
       state.currentBet = cfg.defaultBet;
       state.history = [];
     }
-    if (state.currentBet > state.balance && state.balance >= cfg.minBet) {
-      state.currentBet = clamp(Math.floor(state.balance / 10) * 10 || cfg.minBet, cfg.minBet, cfg.maxBet);
-    }
-    if (state.balance < cfg.minBet) {
-      state.balance = cfg.startBalance;
-    }
+    if (state.balance < cfg.minBet) state.balance = cfg.startBalance;
+    if (state.currentBet > state.balance) state.currentBet = Math.min(cfg.defaultBet, state.balance);
+    if (state.currentBet < cfg.minBet) state.currentBet = cfg.minBet;
   }
 
   function formatInt(value) {
@@ -109,17 +107,16 @@
     ui.betInput.value = String(state.currentBet);
   }
 
-  function setBadge(text, type) {
+  function setBadge(text, running) {
     ui.badge.textContent = text;
     ui.badge.className = 'badge';
-    ui.badge.classList.add(type === 'running' ? 'badge-limit' : 'badge-idle');
+    ui.badge.classList.add(running ? 'badge-limit' : 'badge-idle');
   }
 
   function updateButtons() {
     const canStart = state.gameState === 'idle' && state.currentBet >= cfg.minBet && state.currentBet <= state.balance;
     ui.startBtn.disabled = !canStart;
     ui.cashoutBtn.disabled = state.gameState !== 'running' || state.cashedOut;
-
     ui.cashoutBtn.classList.toggle('cashout-live', state.gameState === 'running' && !state.cashedOut);
 
     if (state.gameState === 'running' && !state.cashedOut) {
@@ -155,17 +152,14 @@
     let roll = Math.random() * totalChance;
     for (const band of cfg.crashDistribution) {
       roll -= band.chance;
-      if (roll <= 0) {
-        return clamp(rand(band.min, band.max), 1, cfg.maxCrash);
-      }
+      if (roll <= 0) return clamp(rand(band.min, band.max), 1, cfg.maxCrash);
     }
     return cfg.maxCrash;
   }
 
   function estimateRoundDuration(crashPoint) {
     const normalized = (crashPoint - 1) / (cfg.maxCrash - 1);
-    const ms = cfg.minRoundDurationMs + normalized * (cfg.maxRoundDurationMs - cfg.minRoundDurationMs);
-    return Math.round(ms);
+    return Math.round(cfg.minRoundDurationMs + normalized * (cfg.maxRoundDurationMs - cfg.minRoundDurationMs));
   }
 
   function resizeCanvas() {
@@ -193,64 +187,50 @@
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    const gradient = ctx.createLinearGradient(0, rect.height, rect.width, 0);
-    gradient.addColorStop(0, '#ff48d7');
-    gradient.addColorStop(0.45, '#b06bff');
-    gradient.addColorStop(1, '#64e6ff');
+    const glow = ctx.createLinearGradient(0, rect.height, rect.width, 0);
+    glow.addColorStop(0, '#ff48d7');
+    glow.addColorStop(0.45, '#b06bff');
+    glow.addColorStop(1, '#64e6ff');
 
-    ctx.strokeStyle = 'rgba(255, 72, 215, 0.25)';
-    ctx.lineWidth = 18;
+    ctx.strokeStyle = 'rgba(255, 72, 215, 0.22)';
+    ctx.lineWidth = 14;
     ctx.beginPath();
     ctx.moveTo(state.path[0].x, state.path[0].y);
     for (const p of state.path.slice(1)) ctx.lineTo(p.x, p.y);
     ctx.stroke();
 
-    ctx.strokeStyle = gradient;
-    ctx.lineWidth = 8;
+    ctx.strokeStyle = glow;
+    ctx.lineWidth = 6;
     ctx.beginPath();
     ctx.moveTo(state.path[0].x, state.path[0].y);
     for (const p of state.path.slice(1)) ctx.lineTo(p.x, p.y);
     ctx.stroke();
 
     state.path.forEach((p, index) => {
-      if (index % 14 === 0) {
+      if (index % 12 === 0) {
         ctx.fillStyle = '#fff1a6';
         ctx.beginPath();
-        ctx.arc(p.x, p.y, 2.3, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
         ctx.fill();
       }
     });
-
-    if (state.path.length > 20) {
-      const marks = [0.15, 0.35, 0.6, 0.8];
-      marks.forEach(mark => {
-        const idx = Math.min(state.path.length - 1, Math.floor(state.path.length * mark));
-        const p = state.path[idx];
-        const pseudo = (1 + (state.currentMultiplier - 1) * mark).toFixed(2);
-        ctx.fillStyle = '#ffd7ff';
-        ctx.font = '700 14px Inter';
-        ctx.fillText(`${pseudo}x`, p.x + 8, p.y - 10);
-      });
-    }
-
     ctx.restore();
   }
 
-  function setPilotPosition(progress, multiplier) {
+  function setPilotPosition(progress) {
     const rect = ui.scene.getBoundingClientRect();
-    const x = 60 + progress * (rect.width - 180);
-    const arc = Math.sin(progress * Math.PI * 0.92);
-    const y = rect.height - 116 - arc * (rect.height * 0.58);
+    const x = 18 + progress * (rect.width - 110);
+    const arc = Math.sin(progress * Math.PI * 0.9);
+    const y = rect.height - 78 - arc * (rect.height * 0.58);
     ui.pilot.style.left = `${x}px`;
     ui.pilot.style.top = `${y}px`;
-    const tilt = clamp(14 - progress * 42, -38, 14);
-    const scale = 0.88 + progress * 0.22;
+    ui.pilot.style.bottom = 'auto';
+    const tilt = clamp(18 - progress * 34, -24, 18);
+    const scale = 0.95 + progress * 0.14;
     ui.pilot.style.transform = `rotate(${tilt}deg) scale(${scale})`;
-
-    state.path.push({ x: x + 36, y: y + 60 });
-    if (state.path.length > 120) state.path.shift();
-
-    if (multiplier > 8 && Math.random() < 0.15) addSpark(x + 24, y + 48);
+    state.path.push({ x: x + 30, y: y + 44 });
+    if (state.path.length > 90) state.path.shift();
+    if (state.currentMultiplier > 7 && Math.random() < 0.14) addSpark(x + 26, y + 42);
   }
 
   function addSpark(x, y) {
@@ -258,20 +238,29 @@
     spark.className = 'spark';
     spark.style.left = `${x}px`;
     spark.style.top = `${y}px`;
-    spark.style.setProperty('--dx', `${rand(-32, 32)}px`);
-    spark.style.setProperty('--dy', `${rand(-18, 28)}px`);
+    spark.style.setProperty('--dx', `${rand(-24, 24)}px`);
+    spark.style.setProperty('--dy', `${rand(-16, 20)}px`);
     ui.sparkLayer.appendChild(spark);
     setTimeout(() => spark.remove(), 800);
+  }
+
+  function resetPilotToIdle() {
+    ui.pilot.className = 'pilot state-idle';
+    ui.pilot.style.left = '24px';
+    ui.pilot.style.top = '';
+    ui.pilot.style.bottom = '72px';
+    ui.pilot.style.transform = 'rotate(0deg) scale(1)';
   }
 
   function startRound() {
     normalizeBet(ui.betInput.value);
     if (state.currentBet > state.balance) {
-      updateStatusText('Недостаточно монет для такой ставки.');
+      updateStatusText('Недостаточно монет');
       updateButtons();
       return;
     }
 
+    clearTimeout(state.resetTimer);
     state.balance -= state.currentBet;
     state.currentMultiplier = 1;
     state.crashPoint = generateCrashPoint();
@@ -279,14 +268,12 @@
     state.gameState = 'running';
     state.cashedOut = false;
     state.startAt = performance.now();
-    state.lastFrame = state.startAt;
-    clearTimeout(state.pendingCrashTimeout);
     clearTrail();
 
     ui.multiplier.textContent = '1.00x';
     updateBalanceUI();
-    updateStatusText(`Раунд запущен. Краш будет где-то до ${state.crashPoint.toFixed(2)}x`);
-    setBadge('Полёт', 'running');
+    updateStatusText('');
+    setBadge('Полёт', true);
     ui.pilot.className = 'pilot state-fly';
     ui.explosion.classList.add('hidden');
     updateButtons();
@@ -305,7 +292,7 @@
 
     ui.multiplier.textContent = `${state.currentMultiplier.toFixed(2)}x`;
     updateButtons();
-    setPilotPosition(progress, state.currentMultiplier);
+    setPilotPosition(progress);
     drawTrail();
 
     if (state.currentMultiplier >= state.crashPoint - 0.005 || progress >= 1) {
@@ -327,9 +314,9 @@
     state.gameState = 'idle';
     updateBalanceUI();
     renderHistory();
-    updateStatusText(`Успешно! Забрано ${formatInt(payout)} ${cfg.currencyName}.`);
-    setBadge('Успех', 'idle');
-    ui.pilot.className = 'pilot state-idle';
+    updateStatusText(`Забрано ${formatInt(payout)}`);
+    setBadge('Успех', false);
+    resetPilotToIdle();
     updateButtons();
     saveState();
     tg && tg.HapticFeedback && tg.HapticFeedback.notificationOccurred('success');
@@ -343,37 +330,25 @@
     state.history.unshift(state.currentMultiplier);
     state.history = state.history.slice(0, cfg.historySize);
     renderHistory();
-    updateStatusText(`Краш на ${state.currentMultiplier.toFixed(2)}x. Попробуй ещё раз.`);
-    setBadge('Краш', 'idle');
+    updateStatusText('');
+    setBadge('Краш', false);
     updateButtons();
 
     ui.pilot.className = 'pilot state-fall';
-    const startLeft = parseFloat(ui.pilot.style.left || '80');
-    const startTop = parseFloat(ui.pilot.style.top || '200');
-    const fallTo = ui.scene.clientHeight - 130;
-    const started = performance.now();
+    const left = parseFloat(ui.pilot.style.left || '24');
+    const top = parseFloat(ui.pilot.style.top || '160');
+    ui.pilot.style.left = `${left + 40}px`;
+    ui.pilot.style.top = `${Math.min(ui.scene.clientHeight - 90, top + 90)}px`;
+    ui.pilot.style.transform = 'rotate(96deg) scale(.92)';
 
-    const animateFall = (time) => {
-      const p = clamp((time - started) / 650, 0, 1);
-      ui.pilot.style.left = `${startLeft + p * 90}px`;
-      ui.pilot.style.top = `${startTop + p * (fallTo - startTop)}px`;
-      ui.pilot.style.transform = `rotate(${24 + p * 110}deg) scale(${1 - p * 0.1})`;
-      if (p < 1) {
-        requestAnimationFrame(animateFall);
-      } else {
-        doExplosion(startLeft + 110, fallTo + 28);
-        state.gameState = 'idle';
-        ui.pilot.className = 'pilot state-idle';
-        ui.pilot.style.left = '84px';
-        ui.pilot.style.top = '';
-        ui.pilot.style.bottom = '92px';
-        ui.pilot.style.transform = 'rotate(0deg) scale(1)';
-        updateButtons();
-        saveState();
-      }
-    };
+    state.gameState = 'idle';
+    setTimeout(() => doExplosion(left + 58, Math.min(ui.scene.clientHeight - 48, top + 108)), 70);
+    state.resetTimer = setTimeout(() => {
+      resetPilotToIdle();
+      updateButtons();
+      saveState();
+    }, 420);
 
-    requestAnimationFrame(animateFall);
     tg && tg.HapticFeedback && tg.HapticFeedback.notificationOccurred('error');
   }
 
@@ -389,8 +364,8 @@
     void ui.explosion.offsetWidth;
     ui.explosion.classList.add('active');
 
-    for (let i = 0; i < 18; i++) addSpark(x, y);
-    setTimeout(() => ui.explosion.classList.add('hidden'), 700);
+    for (let i = 0; i < 22; i++) addSpark(x, y);
+    setTimeout(() => ui.explosion.classList.add('hidden'), 680);
   }
 
   function bindEvents() {
@@ -399,9 +374,7 @@
     ui.minusBtn.addEventListener('click', () => normalizeBet(state.currentBet - 50));
     ui.plusBtn.addEventListener('click', () => normalizeBet(state.currentBet + 50));
     ui.betInput.addEventListener('change', (e) => normalizeBet(e.target.value));
-    document.querySelectorAll('.preset-btn').forEach(btn => {
-      btn.addEventListener('click', () => normalizeBet(btn.dataset.bet));
-    });
+    document.querySelectorAll('.preset-btn').forEach(btn => btn.addEventListener('click', () => normalizeBet(btn.dataset.bet)));
     window.addEventListener('resize', () => {
       resizeCanvas();
       drawTrail();
@@ -410,16 +383,15 @@
 
   function init() {
     loadState();
-    if (state.currentBet > state.balance) state.currentBet = Math.min(cfg.defaultBet, state.balance);
-    if (state.currentBet < cfg.minBet) state.currentBet = cfg.minBet;
     updateBalanceUI();
     updateBetUI();
     renderHistory();
     updateButtons();
     resizeCanvas();
     clearTrail();
-    updateStatusText('Нажми «Старт», чтобы начать раунд');
-    setBadge('Ожидание', 'idle');
+    updateStatusText('Нажми «Старт»');
+    setBadge('Ожидание', false);
+    resetPilotToIdle();
     bindEvents();
   }
 

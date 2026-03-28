@@ -5,8 +5,8 @@ window.NOVA_CONFIG = {
   minBet: 10,
   maxBet: 10000,
   maxCrash: 50,
-  historySize: 7,
-  storageKey: 'novarush_v3_state',
+  historySize: 6,
+  storageKey: 'novarush_v4_state',
   crashDistribution: [
     { chance: 40, min: 1.0, max: 2.0 },
     { chance: 30, min: 2.01, max: 5.0 },
@@ -15,7 +15,7 @@ window.NOVA_CONFIG = {
     { chance: 4, min: 20.01, max: 35.0 },
     { chance: 1, min: 35.01, max: 50.0 }
   ],
-  multiplierGrowth: 0.78,
-  minRoundDurationMs: 1400,
-  maxRoundDurationMs: 12000
+  multiplierGrowth: 0.82,
+  minRoundDurationMs: 1100,
+  maxRoundDurationMs: 7600
 };
