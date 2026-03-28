@@ -5,7 +5,7 @@ window.NovaRushConfig = {
   quickBets: [100, 500, 1000, 5000, 10000],
   maxCrash: 50,
   historySize: 8,
-  cacheVersion: 'ready-1',
+  cacheVersion: 'clean-1',
   crashRanges: [
     { min: 1.00, max: 2.00, weight: 40 },
     { min: 2.01, max: 5.00, weight: 30 },

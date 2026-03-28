@@ -4,9 +4,9 @@
   try {
     tg.ready();
     tg.expand();
-    tg.setHeaderColor('#1c0850');
-    tg.setBackgroundColor('#120336');
+    tg.setHeaderColor('#1a0551');
+    tg.setBackgroundColor('#16044a');
   } catch (e) {
-    console.warn('Telegram init skipped', e);
+    console.warn('Telegram WebApp init skipped', e);
   }
 })();

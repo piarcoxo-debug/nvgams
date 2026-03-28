@@ -5,27 +5,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>NOVA RUSH</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="styles.css?v=ready-1" />
+  <link rel="stylesheet" href="styles.css?v=clean-1" />
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
   <div class="app-shell">
     <header class="topbar">
       <div class="brand">NOVA RUSH</div>
-      <div class="balance-box">
+      <div class="balance-wrap">
         <div class="balance-label">Баланс</div>
         <div class="balance-value" id="balanceValue">10 000 монет</div>
       </div>
     </header>
 
-    <section id="historyStrip" class="history-strip"></section>
+    <section id="historyStrip" class="history-strip" aria-label="Последние коэффициенты"></section>
 
-    <section class="stage" id="stage">
-      <div class="stage-glow"></div>
-      <canvas id="trailCanvas"></canvas>
+    <section class="stage" id="stage" aria-label="Игровая сцена">
+      <div class="sky-glow"></div>
+      <canvas id="trailCanvas" aria-hidden="true"></canvas>
       <div id="multiplierValue" class="multiplier">1.00x</div>
-      <img id="pilot" class="pilot" src="assets/pilot.png" alt="pilot" />
-      <div id="explosion" class="explosion hidden"></div>
+      <img id="pilot" class="pilot" src="assets/pilot.svg" alt="pilot" />
+      <div id="explosion" class="explosion hidden" aria-hidden="true"></div>
       <img class="city" src="assets/city.svg" alt="city" />
       <div class="cloud cloud-a"></div>
       <div class="cloud cloud-b"></div>
@@ -33,7 +33,7 @@
     </section>
 
     <section class="controls">
-      <div class="bet-row primary-bet-row">
+      <div class="bet-row main-bet-row">
         <button type="button" class="delta-btn" data-delta="-50">-50</button>
         <input id="betInput" class="bet-input" type="number" min="50" step="50" inputmode="numeric" />
         <button type="button" class="delta-btn" data-delta="50">+50</button>
@@ -45,8 +45,9 @@
       </div>
     </section>
   </div>
-  <script src="config.js?v=ready-1"></script>
-  <script src="telegram.js?v=ready-1"></script>
-  <script src="app.js?v=ready-1"></script>
+
+  <script src="config.js?v=clean-1"></script>
+  <script src="telegram.js?v=clean-1"></script>
+  <script src="app.js?v=clean-1"></script>
 </body>
 </html>
