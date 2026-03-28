@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 170">
+  <defs>
+    <linearGradient id="suit" x1="0" x2="1">
+      <stop offset="0%" stop-color="#1e1634"/>
+      <stop offset="100%" stop-color="#40306b"/>
+    </linearGradient>
+    <linearGradient id="hair" x1="0" x2="1">
+      <stop offset="0%" stop-color="#fff3a8"/>
+      <stop offset="100%" stop-color="#ffb84d"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(18 8) rotate(58 95 70)">
+    <ellipse cx="138" cy="79" rx="18" ry="14" fill="#f5c09f"/>
+    <path d="M116 48 C128 15, 166 17, 172 55 C150 49, 137 45, 116 48" fill="url(#hair)"/>
+    <path d="M111 49 C119 26, 141 11, 171 35 C184 45, 182 70, 165 72 C151 58, 135 51, 111 49" fill="url(#hair)"/>
+    <rect x="124" y="72" width="28" height="14" rx="7" fill="#1a1730"/>
+    <rect x="54" y="58" width="35" height="55" rx="12" fill="#696f92"/>
+    <path d="M84 71 C103 51, 133 47, 151 62 C150 80, 142 95, 124 100 C100 97, 87 90, 84 71" fill="url(#suit)"/>
+    <path d="M48 81 C28 88, 20 102, 18 119 C35 111, 45 104, 58 97" fill="url(#suit)"/>
+    <path d="M104 101 C91 118, 87 138, 96 156 L110 154 C110 136, 114 119, 127 102" fill="url(#suit)"/>
+    <path d="M129 100 C125 122, 133 143, 156 159 L168 151 C153 135, 145 118, 150 96" fill="url(#suit)"/>
+    <path d="M44 114 C29 121, 20 132, 19 148 C33 142, 45 134, 58 123" fill="url(#suit)"/>
+    <path d="M95 154 L112 153 L114 163 L99 165 Z" fill="#151126"/>
+    <path d="M156 159 L169 151 L177 160 L162 167 Z" fill="#151126"/>
+  </g>
+</svg>

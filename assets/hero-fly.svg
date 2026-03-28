@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 170">
+  <defs>
+    <linearGradient id="suit" x1="0" x2="1">
+      <stop offset="0%" stop-color="#1e1634"/>
+      <stop offset="100%" stop-color="#40306b"/>
+    </linearGradient>
+    <linearGradient id="hair" x1="0" x2="1">
+      <stop offset="0%" stop-color="#fff3a8"/>
+      <stop offset="100%" stop-color="#ffb84d"/>
+    </linearGradient>
+    <linearGradient id="trail" x1="0" x2="1">
+      <stop offset="0%" stop-color="#ff3bcf"/>
+      <stop offset="50%" stop-color="#64efff"/>
+      <stop offset="100%" stop-color="#ffd84f"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <path d="M16 120 C2 126, 8 144, 42 136 C62 132, 70 120, 82 111" fill="none" stroke="url(#trail)" stroke-width="18" stroke-linecap="round" filter="url(#glow)" opacity="0.85"/>
+  <path d="M24 118 C12 123, 16 136, 43 131 C58 128, 65 119, 75 112" fill="none" stroke="#ffffff" stroke-opacity=".6" stroke-width="4" stroke-linecap="round"/>
+  <g transform="translate(35 12) rotate(-8 85 70)">
+    <ellipse cx="129" cy="73" rx="18" ry="14" fill="#f5c09f"/>
+    <path d="M110 44 C120 15, 160 16, 165 52 C148 47, 135 42, 110 44" fill="url(#hair)"/>
+    <path d="M105 45 C113 25, 135 10, 164 32 C180 45, 176 64, 162 65 C148 53, 132 48, 105 45" fill="url(#hair)"/>
+    <rect x="116" y="68" width="30" height="16" rx="8" fill="#1a1730"/>
+    <rect x="54" y="58" width="35" height="55" rx="12" fill="#696f92"/>
+    <rect x="60" y="67" width="13" height="26" rx="5" fill="#aeb7d1"/>
+    <rect x="74" y="67" width="8" height="26" rx="4" fill="#2b274d"/>
+    <path d="M48 82 C30 86, 25 99, 25 115 C40 108, 44 103, 59 100" fill="url(#suit)"/>
+    <path d="M85 73 C102 52, 132 47, 149 63 C149 80, 141 95, 122 100 C98 97, 87 91, 85 73" fill="url(#suit)"/>
+    <path d="M104 101 C96 117, 97 132, 102 149 L116 149 C118 129, 122 114, 130 101" fill="url(#suit)"/>
+    <path d="M131 100 C127 117, 132 136, 150 151 L162 145 C152 128, 147 111, 150 97" fill="url(#suit)"/>
+    <path d="M85 79 C72 71, 59 70, 49 78 L53 90 C63 86, 72 86, 83 92" fill="url(#suit)"/>
+    <circle cx="148" cy="77" r="4" fill="#ff7bc9"/>
+    <path d="M48 112 C33 116, 28 128, 29 139 C43 134, 51 127, 61 121" fill="url(#suit)"/>
+    <path d="M100 148 L118 148 L121 158 L104 158 Z" fill="#151126"/>
+    <path d="M150 150 L166 144 L173 154 L158 160 Z" fill="#151126"/>
+    <circle cx="48" cy="93" r="6" fill="#ff9c3d"/>
+    <circle cx="42" cy="97" r="9" fill="#ffd35a" opacity="0.75" filter="url(#glow)"/>
+  </g>
+</svg>

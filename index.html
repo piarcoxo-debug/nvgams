@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>NovaRush Demo</title>
+  <meta name="theme-color" content="#12092b" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand__logo">NR</div>
+        <div>
+          <div class="brand__name">NovaRush</div>
+          <div class="brand__sub">free mini app demo</div>
+        </div>
+      </div>
+      <div class="balance-pill">
+        <img src="./assets/coin.svg" alt="" />
+        <span id="balanceValue">10000</span>
+        <small data-currency-name>монет</small>
+      </div>
+    </header>
+
+    <main class="game-card">
+      <section class="arena-wrap">
+        <canvas id="gameCanvas" aria-label="Игровая сцена"></canvas>
+
+        <div class="hud hud--left">
+          <div class="panel">
+            <div class="panel__label">Раунд</div>
+            <div class="panel__value" id="roundStatus">Ожидание</div>
+          </div>
+          <div class="panel">
+            <div class="panel__label">Макс. коэффициент</div>
+            <div class="panel__value" id="maxCrashValue">50.00x</div>
+          </div>
+        </div>
+
+        <div class="hud hud--center">
+          <div class="multiplier" id="multiplierValue">1.00x</div>
+          <div class="subtext" id="hintText">Нажми «Старт», чтобы запустить раунд.</div>
+        </div>
+
+        <div class="hud hud--right">
+          <div class="history-card">
+            <div class="history-card__title">Последние раунды</div>
+            <div id="historyList" class="history-list"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="controls">
+        <div class="bet-box">
+          <label for="betInput">Ставка</label>
+          <div class="bet-row">
+            <button type="button" class="mini-btn" data-bet-mod="-50">-50</button>
+            <input id="betInput" type="number" min="10" max="5000" step="10" value="100" inputmode="numeric" />
+            <button type="button" class="mini-btn" data-bet-mod="+50">+50</button>
+          </div>
+        </div>
+
+        <button type="button" id="startBtn" class="action-btn action-btn--start">Старт</button>
+        <button type="button" id="cashoutBtn" class="action-btn action-btn--cashout" disabled>Забрать 100</button>
+      </section>
+    </main>
+
+    <section class="notes">
+      <div class="note">
+        <strong>Как работает демо:</strong> старт всегда с <b>1.00x</b>, каждый раунд получает случайный crash-point до <b id="maxCrashNote">50.00x</b>, баланс и история хранятся в браузере.
+      </div>
+      <div class="note" id="probabilityNote"></div>
+      <div class="note">
+        <strong>Telegram Mini App:</strong> страница корректно открывается и внутри Telegram WebApp, и как обычный сайт на GitHub Pages.
+      </div>
+    </section>
+  </div>
+
+  <script src="./config.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
