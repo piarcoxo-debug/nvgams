@@ -1,15 +1,21 @@
-window.NovaRushConfig = {
+window.NOVA_CONFIG = {
+  currencyName: 'монет',
   startBalance: 10000,
-  maxCrash: 50,
-  currencyName: "монет",
+  defaultBet: 100,
   minBet: 10,
-  maxBet: 5000,
-  distribution: [
-    { min: 1.0, max: 2.0, chance: 0.40 },
-    { min: 2.01, max: 5.0, chance: 0.30 },
-    { min: 5.01, max: 10.0, chance: 0.15 },
-    { min: 10.01, max: 20.0, chance: 0.10 },
-    { min: 20.01, max: 35.0, chance: 0.04 },
-    { min: 35.01, max: 50.0, chance: 0.01 }
-  ]
+  maxBet: 10000,
+  maxCrash: 50,
+  historySize: 7,
+  storageKey: 'novarush_v2_state',
+  crashDistribution: [
+    { chance: 40, min: 1.0, max: 2.0 },
+    { chance: 30, min: 2.01, max: 5.0 },
+    { chance: 15, min: 5.01, max: 10.0 },
+    { chance: 10, min: 10.01, max: 20.0 },
+    { chance: 4, min: 20.01, max: 35.0 },
+    { chance: 1, min: 35.01, max: 50.0 }
+  ],
+  multiplierGrowth: 0.78,
+  minRoundDurationMs: 1400,
+  maxRoundDurationMs: 12000
 };

@@ -1,84 +1,78 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>NovaRush Demo</title>
-  <meta name="theme-color" content="#12092b" />
-  <link rel="stylesheet" href="./styles.css" />
+  <title>NovaRush V2</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
   <div class="app-shell">
-    <header class="topbar">
-      <div class="brand">
-        <div class="brand__logo">NR</div>
-        <div>
-          <div class="brand__name">NovaRush</div>
-          <div class="brand__sub">free mini app demo</div>
-        </div>
-      </div>
-      <div class="balance-pill">
-        <img src="./assets/coin.svg" alt="" />
-        <span id="balanceValue">10000</span>
-        <small data-currency-name>монет</small>
-      </div>
-    </header>
-
-    <main class="game-card">
-      <section class="arena-wrap">
-        <canvas id="gameCanvas" aria-label="Игровая сцена"></canvas>
-
-        <div class="hud hud--left">
-          <div class="panel">
-            <div class="panel__label">Раунд</div>
-            <div class="panel__value" id="roundStatus">Ожидание</div>
-          </div>
-          <div class="panel">
-            <div class="panel__label">Макс. коэффициент</div>
-            <div class="panel__value" id="maxCrashValue">50.00x</div>
+    <div class="game-card">
+      <header class="topbar">
+        <div class="brand-box">
+          <div class="brand">NOVA RUSH</div>
+          <div class="status-row">
+            <span id="gameStateBadge" class="badge badge-idle">Ожидание</span>
+            <span class="badge badge-limit">Макс. 50.00x</span>
           </div>
         </div>
 
-        <div class="hud hud--center">
-          <div class="multiplier" id="multiplierValue">1.00x</div>
-          <div class="subtext" id="hintText">Нажми «Старт», чтобы запустить раунд.</div>
+        <div class="center-readout">
+          <div id="multiplier" class="multiplier">1.00x</div>
+          <div id="statusText" class="status-text">Нажми «Старт», чтобы начать раунд</div>
         </div>
 
-        <div class="hud hud--right">
-          <div class="history-card">
-            <div class="history-card__title">Последние раунды</div>
+        <div class="side-panel">
+          <div class="balance-box">
+            <span>Баланс</span>
+            <strong id="balance">10 000 монет</strong>
+          </div>
+          <div class="history-box">
+            <span>Последние раунды</span>
             <div id="historyList" class="history-list"></div>
           </div>
         </div>
-      </section>
+      </header>
 
-      <section class="controls">
-        <div class="bet-box">
+      <main class="scene-wrap">
+        <div class="parallax city-back"></div>
+        <div class="parallax city-front"></div>
+        <canvas id="trailCanvas" class="trail-canvas"></canvas>
+        <div id="sparkLayer" class="spark-layer"></div>
+        <div id="explosion" class="explosion hidden"></div>
+        <div id="pilot" class="pilot state-idle" aria-label="персонаж"></div>
+        <div class="ground-line"></div>
+      </main>
+
+      <footer class="control-bar">
+        <div class="bet-panel">
           <label for="betInput">Ставка</label>
           <div class="bet-row">
-            <button type="button" class="mini-btn" data-bet-mod="-50">-50</button>
-            <input id="betInput" type="number" min="10" max="5000" step="10" value="100" inputmode="numeric" />
-            <button type="button" class="mini-btn" data-bet-mod="+50">+50</button>
+            <button id="minusBtn" type="button" class="mini-btn">-50</button>
+            <input id="betInput" type="number" inputmode="numeric" min="10" step="10" value="100" />
+            <button id="plusBtn" type="button" class="mini-btn">+50</button>
+          </div>
+          <div class="bet-presets">
+            <button type="button" class="preset-btn" data-bet="100">100</button>
+            <button type="button" class="preset-btn" data-bet="500">500</button>
+            <button type="button" class="preset-btn" data-bet="1000">1000</button>
+            <button type="button" class="preset-btn" data-bet="5000">5000</button>
+            <button type="button" class="preset-btn" data-bet="10000">10000</button>
           </div>
         </div>
 
-        <button type="button" id="startBtn" class="action-btn action-btn--start">Старт</button>
-        <button type="button" id="cashoutBtn" class="action-btn action-btn--cashout" disabled>Забрать 100</button>
-      </section>
-    </main>
-
-    <section class="notes">
-      <div class="note">
-        <strong>Как работает демо:</strong> старт всегда с <b>1.00x</b>, каждый раунд получает случайный crash-point до <b id="maxCrashNote">50.00x</b>, баланс и история хранятся в браузере.
-      </div>
-      <div class="note" id="probabilityNote"></div>
-      <div class="note">
-        <strong>Telegram Mini App:</strong> страница корректно открывается и внутри Telegram WebApp, и как обычный сайт на GitHub Pages.
-      </div>
-    </section>
+        <div class="action-panel">
+          <button id="startBtn" type="button" class="action-btn start-btn">Старт</button>
+          <button id="cashoutBtn" type="button" class="action-btn cashout-btn" disabled>Забрать</button>
+        </div>
+      </footer>
+    </div>
   </div>
 
-  <script src="./config.js"></script>
-  <script src="./app.js"></script>
+  <script src="config.js"></script>
+  <script src="telegram.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>

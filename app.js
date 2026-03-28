@@ -1,418 +1,427 @@
-const CONFIG = window.NovaRushConfig || {};
-CONFIG.startBalance = Number.isFinite(Number(CONFIG.startBalance)) ? Number(CONFIG.startBalance) : 10000;
-CONFIG.maxCrash = Number.isFinite(Number(CONFIG.maxCrash)) ? Number(CONFIG.maxCrash) : 50;
-CONFIG.currencyName = String(CONFIG.currencyName || "монет");
-CONFIG.minBet = Number.isFinite(Number(CONFIG.minBet)) ? Number(CONFIG.minBet) : 10;
-CONFIG.maxBet = Number.isFinite(Number(CONFIG.maxBet)) ? Number(CONFIG.maxBet) : 5000;
+(() => {
+  const cfg = window.NOVA_CONFIG;
+  const tg = window.NovaTelegram ? window.NovaTelegram.init() : null;
 
-const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
-const balanceValue = document.getElementById("balanceValue");
-const multiplierValue = document.getElementById("multiplierValue");
-const roundStatus = document.getElementById("roundStatus");
-const hintText = document.getElementById("hintText");
-const historyList = document.getElementById("historyList");
-const betInput = document.getElementById("betInput");
-const startBtn = document.getElementById("startBtn");
-const cashoutBtn = document.getElementById("cashoutBtn");
-const currencyNodes = document.querySelectorAll("[data-currency-name]");
-const maxCrashValue = document.getElementById("maxCrashValue");
-const maxCrashNote = document.getElementById("maxCrashNote");
-const probabilityNote = document.getElementById("probabilityNote");
+  const ui = {
+    balance: document.getElementById('balance'),
+    multiplier: document.getElementById('multiplier'),
+    statusText: document.getElementById('statusText'),
+    historyList: document.getElementById('historyList'),
+    badge: document.getElementById('gameStateBadge'),
+    betInput: document.getElementById('betInput'),
+    minusBtn: document.getElementById('minusBtn'),
+    plusBtn: document.getElementById('plusBtn'),
+    startBtn: document.getElementById('startBtn'),
+    cashoutBtn: document.getElementById('cashoutBtn'),
+    scene: document.querySelector('.scene-wrap'),
+    pilot: document.getElementById('pilot'),
+    trailCanvas: document.getElementById('trailCanvas'),
+    sparkLayer: document.getElementById('sparkLayer'),
+    explosion: document.getElementById('explosion')
+  };
 
-const heroFly = loadImage("./assets/hero-fly.svg");
-const heroFall = loadImage("./assets/hero-fall.svg");
-const explosionImg = loadImage("./assets/explosion.svg");
+  const state = {
+    balance: cfg.startBalance,
+    currentBet: cfg.defaultBet,
+    history: [],
+    gameState: 'idle',
+    currentMultiplier: 1,
+    crashPoint: null,
+    startAt: 0,
+    lastFrame: 0,
+    rafId: 0,
+    path: [],
+    cashedOut: false,
+    roundDuration: 3000,
+    pendingCrashTimeout: null,
+    particlesTimer: null
+  };
 
-const DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
-let roundResetTimer = null;
-
-function loadImage(src) {
-  const img = new Image();
-  img.src = src;
-  return img;
-}
-function safeNumber(value, fallback) {
-  return Number.isFinite(Number(value)) ? Number(value) : fallback;
-}
-function clamp(num, min, max) {
-  return Math.min(max, Math.max(min, num));
-}
-function randomBetween(min, max) {
-  if (max <= min) return Number(min.toFixed(2));
-  return Number((Math.random() * (max - min) + min).toFixed(2));
-}
-function normalizeDistribution() {
-  const raw = Array.isArray(CONFIG.distribution) ? CONFIG.distribution : [];
-  const valid = raw
-    .map((item) => ({
-      min: safeNumber(item.min, NaN),
-      max: safeNumber(item.max, NaN),
-      chance: safeNumber(item.chance, NaN)
-    }))
-    .filter((item) => Number.isFinite(item.min) && Number.isFinite(item.max) && Number.isFinite(item.chance) && item.chance > 0);
-
-  const capped = valid
-    .map((item) => ({
-      min: clamp(item.min, 1, CONFIG.maxCrash),
-      max: clamp(item.max, 1, CONFIG.maxCrash),
-      chance: item.chance
-    }))
-    .filter((item) => item.max >= item.min);
-
-  if (!capped.length) {
-    return [{ min: 1, max: CONFIG.maxCrash, chance: 1 }];
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
   }
 
-  const total = capped.reduce((sum, item) => sum + item.chance, 0);
-  return capped.map((item) => ({ ...item, chance: item.chance / total }));
-}
-const DISTRIBUTION = normalizeDistribution();
-function formatDistributionNote() {
-  const text = DISTRIBUTION.map((item) => `${item.min.toFixed(2)}–${item.max.toFixed(2)}x — ${(item.chance * 100).toFixed(0)}%`).join(", ");
-  probabilityNote.innerHTML = `<strong>Шансы по диапазонам:</strong> ${text}.`;
-}
-function loadState() {
-  let balance = CONFIG.startBalance;
-  let history = [];
-  try {
-    balance = safeNumber(localStorage.getItem("nr.balance"), CONFIG.startBalance);
-    history = JSON.parse(localStorage.getItem("nr.history") || "[]");
-    if (!Array.isArray(history)) history = [];
-    history = history.map((entry) => safeNumber(entry, NaN)).filter((entry) => Number.isFinite(entry));
-  } catch (error) {
-    console.warn("Local state reset", error);
+  function toNum(value, fallback) {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : fallback;
   }
-  balance = clamp(Math.floor(balance), 0, Number.MAX_SAFE_INTEGER);
-  return { balance, history };
-}
-const persisted = loadState();
-const state = {
-  balance: persisted.balance,
-  history: persisted.history,
-  roundActive: false,
-  crashed: false,
-  cashedOut: false,
-  multiplier: 1,
-  startAt: 0,
-  crashPoint: 1.5,
-  bet: 100,
-  trailPoints: [],
-  milestoneMarks: [],
-  fallProgress: 0,
-  displayT: 0
-};
-function resizeCanvas() {
-  const rect = canvas.getBoundingClientRect();
-  const displayWidth = Math.max(1, Math.round(rect.width));
-  const displayHeight = Math.max(1, Math.round(rect.height));
-  canvas.width = displayWidth * DPR;
-  canvas.height = displayHeight * DPR;
-  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-}
-window.addEventListener("resize", resizeCanvas);
-resizeCanvas();
 
-function generateCrashPoint() {
-  const p = Math.random();
-  let cumulative = 0;
-  for (const bucket of DISTRIBUTION) {
-    cumulative += bucket.chance;
-    if (p <= cumulative + 1e-9) {
-      return randomBetween(bucket.min, bucket.max);
+  function saveState() {
+    try {
+      localStorage.setItem(cfg.storageKey, JSON.stringify({
+        balance: state.balance,
+        currentBet: state.currentBet,
+        history: state.history
+      }));
+    } catch (err) {
+      console.warn('Cannot save state', err);
     }
   }
-  const last = DISTRIBUTION[DISTRIBUTION.length - 1];
-  return randomBetween(last.min, last.max);
-}
-function curvePoint(t) {
-  const w = canvas.clientWidth;
-  const h = canvas.clientHeight;
-  const p0 = { x: 100, y: h - 170 };
-  const p1 = { x: w * 0.32, y: h * 0.56 };
-  const p2 = { x: w * 0.58, y: h * 0.34 };
-  const p3 = { x: w * 0.88, y: 155 };
-  const u = 1 - t;
-  return {
-    x: u ** 3 * p0.x + 3 * u * u * t * p1.x + 3 * u * t * t * p2.x + t ** 3 * p3.x,
-    y: u ** 3 * p0.y + 3 * u * u * t * p1.y + 3 * u * t * t * p2.y + t ** 3 * p3.y
-  };
-}
-function tangentAngle(t) {
-  const pA = curvePoint(clamp(t - 0.01, 0, 1));
-  const pB = curvePoint(clamp(t + 0.01, 0, 1));
-  return Math.atan2(pB.y - pA.y, pB.x - pA.x);
-}
-function multiplierFromTime(seconds) {
-  return clamp(Number(Math.exp(0.69 * seconds).toFixed(2)), 1, CONFIG.maxCrash);
-}
-function durationForCrash(crashPoint) {
-  return Math.max(0.1, Math.log(Math.max(1.01, crashPoint)) / 0.69);
-}
-function sanitizeBet() {
-  const raw = Number(betInput.value) || 0;
-  const maxAllowed = Math.min(CONFIG.maxBet, Math.max(CONFIG.minBet, state.balance || CONFIG.maxBet));
-  const bet = clamp(Math.round(raw), CONFIG.minBet, maxAllowed);
-  betInput.value = String(bet);
-  state.bet = bet;
-  return bet;
-}
-function updateCashoutText() {
-  const bet = sanitizeBet();
-  const payout = Math.floor(bet * state.multiplier);
-  cashoutBtn.textContent = `Забрать ${payout}`;
-}
-function save() {
-  try {
-    localStorage.setItem("nr.balance", String(state.balance));
-    localStorage.setItem("nr.history", JSON.stringify(state.history.slice(0, 10)));
-  } catch (error) {
-    console.warn("Unable to persist local state", error);
+
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(cfg.storageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      state.balance = clamp(Math.floor(toNum(parsed.balance, cfg.startBalance)), 0, 10_000_000);
+      state.currentBet = clamp(Math.floor(toNum(parsed.currentBet, cfg.defaultBet)), cfg.minBet, cfg.maxBet);
+      state.history = Array.isArray(parsed.history) ? parsed.history.filter(v => Number.isFinite(v)).slice(0, cfg.historySize) : [];
+    } catch (err) {
+      console.warn('Bad saved data, reset to defaults');
+      state.balance = cfg.startBalance;
+      state.currentBet = cfg.defaultBet;
+      state.history = [];
+    }
+    if (state.currentBet > state.balance && state.balance >= cfg.minBet) {
+      state.currentBet = clamp(Math.floor(state.balance / 10) * 10 || cfg.minBet, cfg.minBet, cfg.maxBet);
+    }
+    if (state.balance < cfg.minBet) {
+      state.balance = cfg.startBalance;
+    }
   }
-}
-function addHistory(value) {
-  state.history.unshift(value);
-  state.history = state.history.slice(0, 10);
-  save();
-  renderHistory();
-}
-function renderHistory() {
-  historyList.innerHTML = "";
-  if (!state.history.length) {
-    const empty = document.createElement("div");
-    empty.className = "history-chip";
-    empty.textContent = "—";
-    historyList.appendChild(empty);
-    return;
+
+  function formatInt(value) {
+    return new Intl.NumberFormat('ru-RU').format(Math.floor(value));
   }
-  state.history.forEach((entry) => {
-    const chip = document.createElement("div");
-    chip.className = "history-chip " + (entry < 2 ? "low" : entry < 5 ? "mid" : "high");
-    chip.textContent = Number(entry).toFixed(2) + "x";
-    historyList.appendChild(chip);
-  });
-}
-function updateBalance() {
-  balanceValue.textContent = Math.floor(state.balance);
-}
-function resetRoundState() {
-  if (roundResetTimer) {
-    clearTimeout(roundResetTimer);
-    roundResetTimer = null;
+
+  function updateBalanceUI() {
+    ui.balance.textContent = `${formatInt(state.balance)} ${cfg.currencyName}`;
   }
-  state.roundActive = false;
-  state.crashed = false;
-  state.cashedOut = false;
-  state.multiplier = 1;
-  state.startAt = 0;
-  state.crashPoint = 1.2;
-  state.trailPoints = [];
-  state.milestoneMarks = [];
-  state.fallProgress = 0;
-  state.displayT = 0;
-  multiplierValue.textContent = "1.00x";
-  roundStatus.textContent = "Ожидание";
-  hintText.textContent = "Нажми «Старт», чтобы запустить раунд.";
-  startBtn.disabled = false;
-  cashoutBtn.disabled = true;
-  updateCashoutText();
-}
-function finishRoundSoon() {
-  if (roundResetTimer) clearTimeout(roundResetTimer);
-  roundResetTimer = setTimeout(() => {
-    roundStatus.textContent = "Раунд завершён";
-    hintText.textContent = "Можно запускать следующий раунд.";
-    startBtn.disabled = false;
-  }, 1400);
-}
-function startRound() {
-  const bet = sanitizeBet();
-  if (state.roundActive) return;
-  if (bet > state.balance) {
-    hintText.textContent = `Недостаточно ${CONFIG.currencyName} для такой ставки.`;
-    return;
+
+  function renderHistory() {
+    ui.historyList.innerHTML = '';
+    if (!state.history.length) {
+      const empty = document.createElement('div');
+      empty.className = 'history-item';
+      empty.textContent = '—';
+      ui.historyList.appendChild(empty);
+      return;
+    }
+    state.history.forEach(item => {
+      const el = document.createElement('div');
+      el.className = 'history-item ' + (item < 2 ? 'history-low' : item < 5 ? 'history-mid' : 'history-high');
+      el.textContent = `${item.toFixed(2)}x`;
+      ui.historyList.appendChild(el);
+    });
   }
-  if (roundResetTimer) {
-    clearTimeout(roundResetTimer);
-    roundResetTimer = null;
+
+  function updateBetUI() {
+    ui.betInput.value = String(state.currentBet);
   }
-  state.balance -= bet;
-  updateBalance();
-  save();
-  state.roundActive = true;
-  state.crashed = false;
-  state.cashedOut = false;
-  state.multiplier = 1;
-  state.startAt = performance.now();
-  state.crashPoint = generateCrashPoint();
-  state.trailPoints = [];
-  state.milestoneMarks = [{ value: 1.0, pos: curvePoint(0) }];
-  state.fallProgress = 0;
-  state.displayT = 0;
-  roundStatus.textContent = "Полёт";
-  hintText.textContent = "Раунд активен. Crash point скрыт до столкновения.";
-  startBtn.disabled = true;
-  cashoutBtn.disabled = false;
-  updateCashoutText();
-}
-function cashOut() {
-  if (!state.roundActive || state.crashed || state.cashedOut) return;
-  state.cashedOut = true;
-  state.roundActive = false;
-  const payout = Math.floor(state.bet * state.multiplier);
-  state.balance += payout;
-  addHistory(state.multiplier);
-  updateBalance();
-  roundStatus.textContent = "Забрано";
-  hintText.textContent = `Ты забрал ${payout} ${CONFIG.currencyName} на ${state.multiplier.toFixed(2)}x`;
-  startBtn.disabled = false;
-  cashoutBtn.disabled = true;
-  save();
-}
-startBtn.addEventListener("click", startRound);
-cashoutBtn.addEventListener("click", cashOut);
-betInput.addEventListener("change", updateCashoutText);
-betInput.addEventListener("input", updateCashoutText);
-betInput.addEventListener("blur", sanitizeBet);
-for (const btn of document.querySelectorAll("[data-bet-mod]")) {
-  btn.addEventListener("click", () => {
-    const delta = Number(btn.dataset.betMod);
-    betInput.value = String(clamp((Number(betInput.value) || 100) + delta, CONFIG.minBet, CONFIG.maxBet));
-    updateCashoutText();
-  });
-}
-function drawBackground() {
-  const w = canvas.clientWidth, h = canvas.clientHeight;
-  const grad = ctx.createLinearGradient(0, 0, 0, h);
-  grad.addColorStop(0, "#21104c"); grad.addColorStop(0.5, "#120a2d"); grad.addColorStop(1, "#0a0516");
-  ctx.fillStyle = grad; ctx.fillRect(0, 0, w, h);
-  const cityGrad = ctx.createLinearGradient(0, h * 0.7, 0, h);
-  cityGrad.addColorStop(0, "rgba(116, 82, 255, 0.0)"); cityGrad.addColorStop(1, "rgba(130, 62, 255, 0.18)");
-  ctx.fillStyle = cityGrad; ctx.fillRect(0, h * 0.65, w, h * 0.35);
-  for (let i = 0; i < 80; i += 1) {
-    const x = (i * 73) % w, y = (i * 131) % (h * 0.7), r = i % 9 === 0 ? 1.8 : 1;
-    ctx.fillStyle = i % 3 === 0 ? "rgba(255,255,255,0.75)" : "rgba(173,216,255,0.55)";
-    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+
+  function setBadge(text, type) {
+    ui.badge.textContent = text;
+    ui.badge.className = 'badge';
+    ui.badge.classList.add(type === 'running' ? 'badge-limit' : 'badge-idle');
   }
-  const baseY = h - 10;
-  [25, 65, 115, 175, 240, 305, 395, 480, 560, 650, 740].forEach((x, idx) => {
-    const bw = 42 + (idx % 3) * 18, bh = 90 + (idx % 5) * 42;
-    const bGrad = ctx.createLinearGradient(0, baseY - bh, 0, baseY);
-    bGrad.addColorStop(0, "#312067"); bGrad.addColorStop(1, "#0f0a22");
-    ctx.fillStyle = bGrad; ctx.fillRect(x, baseY - bh, bw, bh);
-    for (let wy = baseY - bh + 10; wy < baseY - 10; wy += 14) {
-      for (let wx = x + 8; wx < x + bw - 8; wx += 12) {
-        if ((wx + wy + idx) % 3 === 0) {
-          ctx.fillStyle = (wx + wy) % 2 === 0 ? "#63e8ff" : "#ff62db";
-          ctx.fillRect(wx, wy, 5, 7);
-        }
+
+  function updateButtons() {
+    const canStart = state.gameState === 'idle' && state.currentBet >= cfg.minBet && state.currentBet <= state.balance;
+    ui.startBtn.disabled = !canStart;
+    ui.cashoutBtn.disabled = state.gameState !== 'running' || state.cashedOut;
+
+    ui.cashoutBtn.classList.toggle('cashout-live', state.gameState === 'running' && !state.cashedOut);
+
+    if (state.gameState === 'running' && !state.cashedOut) {
+      ui.cashoutBtn.textContent = `Забрать ${formatInt(state.currentBet * state.currentMultiplier)}`;
+    } else {
+      ui.cashoutBtn.textContent = 'Забрать';
+    }
+  }
+
+  function updateStatusText(text) {
+    ui.statusText.textContent = text;
+  }
+
+  function normalizeBet(raw) {
+    let value = Math.floor(toNum(raw, cfg.defaultBet));
+    if (!Number.isFinite(value)) value = cfg.defaultBet;
+    value = Math.round(value / 10) * 10;
+    value = clamp(value, cfg.minBet, cfg.maxBet);
+    if (value > state.balance) value = state.balance >= cfg.minBet ? clamp(Math.floor(state.balance / 10) * 10, cfg.minBet, cfg.maxBet) : cfg.minBet;
+    if (!Number.isFinite(value) || value < cfg.minBet) value = cfg.minBet;
+    state.currentBet = value;
+    updateBetUI();
+    updateButtons();
+    saveState();
+  }
+
+  function rand(min, max) {
+    return Number((Math.random() * (max - min) + min).toFixed(2));
+  }
+
+  function generateCrashPoint() {
+    const totalChance = cfg.crashDistribution.reduce((sum, item) => sum + item.chance, 0);
+    let roll = Math.random() * totalChance;
+    for (const band of cfg.crashDistribution) {
+      roll -= band.chance;
+      if (roll <= 0) {
+        return clamp(rand(band.min, band.max), 1, cfg.maxCrash);
       }
     }
-  });
-}
-function drawTrail() {
-  if (!state.trailPoints.length) return;
-  const lineGrad = ctx.createLinearGradient(90, canvas.clientHeight - 200, canvas.clientWidth * 0.72, 220);
-  lineGrad.addColorStop(0, "#ff38d8"); lineGrad.addColorStop(0.5, "#61ecff"); lineGrad.addColorStop(1, "#ffd248");
-  ctx.save(); ctx.lineJoin = "round"; ctx.lineCap = "round";
-  ctx.beginPath(); ctx.moveTo(state.trailPoints[0].x, state.trailPoints[0].y); for (const p of state.trailPoints) ctx.lineTo(p.x, p.y);
-  ctx.strokeStyle = "rgba(99, 245, 255, 0.18)"; ctx.lineWidth = 22; ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(state.trailPoints[0].x, state.trailPoints[0].y); for (const p of state.trailPoints) ctx.lineTo(p.x, p.y);
-  ctx.strokeStyle = lineGrad; ctx.lineWidth = 8; ctx.stroke();
-  for (let i = 0; i < state.trailPoints.length; i += 4) {
-    const p = state.trailPoints[i];
-    ctx.fillStyle = i % 8 === 0 ? "#ffe56d" : "#ff73e2";
-    ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI * 2); ctx.fill();
+    return cfg.maxCrash;
   }
-  ctx.font = "800 20px Inter, sans-serif"; ctx.textAlign = "center";
-  for (const mark of state.milestoneMarks) {
-    ctx.fillStyle = "#ffd47c"; ctx.shadowColor = "rgba(255,140,67,0.45)"; ctx.shadowBlur = 18;
-    ctx.fillText(mark.value.toFixed(2) + "x", mark.pos.x + 18, mark.pos.y - 12);
+
+  function estimateRoundDuration(crashPoint) {
+    const normalized = (crashPoint - 1) / (cfg.maxCrash - 1);
+    const ms = cfg.minRoundDurationMs + normalized * (cfg.maxRoundDurationMs - cfg.minRoundDurationMs);
+    return Math.round(ms);
   }
-  ctx.restore();
-}
-function drawHero(t, angle) {
-  const pos = curvePoint(t);
-  if (state.crashed && !state.cashedOut) {
-    const fallX = pos.x + Math.sin(state.fallProgress * Math.PI) * 45;
-    const fallY = pos.y + state.fallProgress * 340;
-    ctx.save(); ctx.translate(fallX, fallY); ctx.rotate(0.7 + state.fallProgress * 1.8); ctx.drawImage(heroFall, -55, -45, 110, 90); ctx.restore();
-    if (state.fallProgress > 0.82) {
-      const scale = 80 + (state.fallProgress - 0.82) * 240;
-      ctx.save(); ctx.globalAlpha = clamp((state.fallProgress - 0.82) * 4.2, 0, 1); ctx.drawImage(explosionImg, fallX - scale / 2, fallY - scale / 2, scale, scale); ctx.restore();
+
+  function resizeCanvas() {
+    const rect = ui.trailCanvas.getBoundingClientRect();
+    ui.trailCanvas.width = Math.max(1, Math.floor(rect.width * window.devicePixelRatio));
+    ui.trailCanvas.height = Math.max(1, Math.floor(rect.height * window.devicePixelRatio));
+    const ctx = ui.trailCanvas.getContext('2d');
+    ctx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
+  }
+
+  function clearTrail() {
+    const ctx = ui.trailCanvas.getContext('2d');
+    const rect = ui.trailCanvas.getBoundingClientRect();
+    ctx.clearRect(0, 0, rect.width, rect.height);
+    state.path = [];
+  }
+
+  function drawTrail() {
+    const ctx = ui.trailCanvas.getContext('2d');
+    const rect = ui.trailCanvas.getBoundingClientRect();
+    ctx.clearRect(0, 0, rect.width, rect.height);
+    if (state.path.length < 2) return;
+
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    const gradient = ctx.createLinearGradient(0, rect.height, rect.width, 0);
+    gradient.addColorStop(0, '#ff48d7');
+    gradient.addColorStop(0.45, '#b06bff');
+    gradient.addColorStop(1, '#64e6ff');
+
+    ctx.strokeStyle = 'rgba(255, 72, 215, 0.25)';
+    ctx.lineWidth = 18;
+    ctx.beginPath();
+    ctx.moveTo(state.path[0].x, state.path[0].y);
+    for (const p of state.path.slice(1)) ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+
+    ctx.strokeStyle = gradient;
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.moveTo(state.path[0].x, state.path[0].y);
+    for (const p of state.path.slice(1)) ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+
+    state.path.forEach((p, index) => {
+      if (index % 14 === 0) {
+        ctx.fillStyle = '#fff1a6';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 2.3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    });
+
+    if (state.path.length > 20) {
+      const marks = [0.15, 0.35, 0.6, 0.8];
+      marks.forEach(mark => {
+        const idx = Math.min(state.path.length - 1, Math.floor(state.path.length * mark));
+        const p = state.path[idx];
+        const pseudo = (1 + (state.currentMultiplier - 1) * mark).toFixed(2);
+        ctx.fillStyle = '#ffd7ff';
+        ctx.font = '700 14px Inter';
+        ctx.fillText(`${pseudo}x`, p.x + 8, p.y - 10);
+      });
     }
-    return;
+
+    ctx.restore();
   }
-  ctx.save(); ctx.translate(pos.x, pos.y); ctx.rotate(angle); ctx.shadowColor = "rgba(255,120,220,0.35)"; ctx.shadowBlur = 28; ctx.drawImage(heroFly, -62, -48, 124, 96); ctx.restore();
-}
-function drawDangerOverlay() {
-  if (state.multiplier < 10 || !state.roundActive) return;
-  const intensity = clamp((state.multiplier - 10) / Math.max(1, CONFIG.maxCrash - 10), 0, 1);
-  const alpha = 0.04 + intensity * 0.16 + Math.sin(performance.now() * 0.01) * 0.01;
-  ctx.fillStyle = `rgba(255, 92, 28, ${alpha})`; ctx.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
-}
-function drawGroundGlow() {
-  const y = canvas.clientHeight - 92;
-  const grad = ctx.createLinearGradient(0, y, 0, canvas.clientHeight);
-  grad.addColorStop(0, "rgba(116, 82, 255, 0)"); grad.addColorStop(1, "rgba(60, 237, 255, 0.15)");
-  ctx.fillStyle = grad; ctx.fillRect(0, y, canvas.clientWidth, canvas.clientHeight - y);
-  ctx.strokeStyle = "rgba(92, 242, 255, 0.75)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0, canvas.clientHeight - 8); ctx.lineTo(canvas.clientWidth, canvas.clientHeight - 8); ctx.stroke();
-}
-function getVisibleCurveT(now) {
-  if (state.roundActive) {
-    const activeDuration = durationForCrash(state.crashPoint);
-    state.displayT = clamp(((now - state.startAt) / 1000) / activeDuration, 0, 1);
-    return state.displayT;
+
+  function setPilotPosition(progress, multiplier) {
+    const rect = ui.scene.getBoundingClientRect();
+    const x = 60 + progress * (rect.width - 180);
+    const arc = Math.sin(progress * Math.PI * 0.92);
+    const y = rect.height - 116 - arc * (rect.height * 0.58);
+    ui.pilot.style.left = `${x}px`;
+    ui.pilot.style.top = `${y}px`;
+    const tilt = clamp(14 - progress * 42, -38, 14);
+    const scale = 0.88 + progress * 0.22;
+    ui.pilot.style.transform = `rotate(${tilt}deg) scale(${scale})`;
+
+    state.path.push({ x: x + 36, y: y + 60 });
+    if (state.path.length > 120) state.path.shift();
+
+    if (multiplier > 8 && Math.random() < 0.15) addSpark(x + 24, y + 48);
   }
-  if (state.crashed) return state.displayT;
-  if (state.cashedOut) return state.displayT;
-  return state.displayT;
-}
-function tick(now) {
-  requestAnimationFrame(tick);
-  if (state.roundActive) {
-    const elapsed = (now - state.startAt) / 1000;
-    state.multiplier = multiplierFromTime(elapsed);
-    const roundDuration = durationForCrash(state.crashPoint);
-    const t = clamp(elapsed / roundDuration, 0, 1);
-    state.displayT = t;
-    const pos = curvePoint(t);
-    const lastPoint = state.trailPoints[state.trailPoints.length - 1];
-    if (!lastPoint || Math.hypot(pos.x - lastPoint.x, pos.y - lastPoint.y) > 8) state.trailPoints.push(pos);
-    const lastMilestone = state.milestoneMarks[state.milestoneMarks.length - 1]?.value ?? 1;
-    if (state.multiplier >= lastMilestone + 1.25 && state.multiplier < state.crashPoint) state.milestoneMarks.push({ value: state.multiplier, pos });
-    if (state.multiplier >= state.crashPoint) {
-      state.multiplier = state.crashPoint;
-      state.roundActive = false;
-      state.crashed = true;
-      state.fallProgress = 0.01;
-      addHistory(state.crashPoint);
-      roundStatus.textContent = "Падение";
-      hintText.textContent = `Краш на ${state.crashPoint.toFixed(2)}x`;
-      startBtn.disabled = true;
-      cashoutBtn.disabled = true;
-      finishRoundSoon();
+
+  function addSpark(x, y) {
+    const spark = document.createElement('div');
+    spark.className = 'spark';
+    spark.style.left = `${x}px`;
+    spark.style.top = `${y}px`;
+    spark.style.setProperty('--dx', `${rand(-32, 32)}px`);
+    spark.style.setProperty('--dy', `${rand(-18, 28)}px`);
+    ui.sparkLayer.appendChild(spark);
+    setTimeout(() => spark.remove(), 800);
+  }
+
+  function startRound() {
+    normalizeBet(ui.betInput.value);
+    if (state.currentBet > state.balance) {
+      updateStatusText('Недостаточно монет для такой ставки.');
+      updateButtons();
+      return;
     }
+
+    state.balance -= state.currentBet;
+    state.currentMultiplier = 1;
+    state.crashPoint = generateCrashPoint();
+    state.roundDuration = estimateRoundDuration(state.crashPoint);
+    state.gameState = 'running';
+    state.cashedOut = false;
+    state.startAt = performance.now();
+    state.lastFrame = state.startAt;
+    clearTimeout(state.pendingCrashTimeout);
+    clearTrail();
+
+    ui.multiplier.textContent = '1.00x';
+    updateBalanceUI();
+    updateStatusText(`Раунд запущен. Краш будет где-то до ${state.crashPoint.toFixed(2)}x`);
+    setBadge('Полёт', 'running');
+    ui.pilot.className = 'pilot state-fly';
+    ui.explosion.classList.add('hidden');
+    updateButtons();
+    saveState();
+
+    cancelAnimationFrame(state.rafId);
+    state.rafId = requestAnimationFrame(tick);
   }
-  if (state.crashed && !state.cashedOut && state.fallProgress < 1) state.fallProgress = Math.min(state.fallProgress + 0.02, 1);
-  multiplierValue.textContent = state.multiplier.toFixed(2) + "x";
-  updateCashoutText();
-  drawBackground();
-  drawTrail();
-  const visibleT = getVisibleCurveT(now);
-  drawHero(visibleT, tangentAngle(visibleT));
-  drawDangerOverlay();
-  drawGroundGlow();
-}
-for (const node of currencyNodes) node.textContent = CONFIG.currencyName;
-maxCrashValue.textContent = CONFIG.maxCrash.toFixed(2) + 'x';
-maxCrashNote.textContent = CONFIG.maxCrash.toFixed(2) + 'x';
-formatDistributionNote();
-resetRoundState();
-renderHistory();
-updateBalance();
-updateCashoutText();
-requestAnimationFrame(tick);
-if (window.Telegram && window.Telegram.WebApp) {
-  try { window.Telegram.WebApp.ready(); window.Telegram.WebApp.expand(); } catch (error) { console.warn("Telegram WebApp init skipped", error); }
-}
+
+  function tick(now) {
+    if (state.gameState !== 'running') return;
+    const elapsed = now - state.startAt;
+    const progress = clamp(elapsed / state.roundDuration, 0, 1);
+    const targetMultiplier = 1 + (state.crashPoint - 1) * (1 - Math.pow(1 - progress, cfg.multiplierGrowth));
+    state.currentMultiplier = clamp(targetMultiplier, 1, state.crashPoint);
+
+    ui.multiplier.textContent = `${state.currentMultiplier.toFixed(2)}x`;
+    updateButtons();
+    setPilotPosition(progress, state.currentMultiplier);
+    drawTrail();
+
+    if (state.currentMultiplier >= state.crashPoint - 0.005 || progress >= 1) {
+      crashRound();
+      return;
+    }
+
+    state.rafId = requestAnimationFrame(tick);
+  }
+
+  function cashOut() {
+    if (state.gameState !== 'running' || state.cashedOut) return;
+    state.cashedOut = true;
+    cancelAnimationFrame(state.rafId);
+    const payout = Math.floor(state.currentBet * state.currentMultiplier);
+    state.balance += payout;
+    state.history.unshift(Number(state.currentMultiplier.toFixed(2)));
+    state.history = state.history.slice(0, cfg.historySize);
+    state.gameState = 'idle';
+    updateBalanceUI();
+    renderHistory();
+    updateStatusText(`Успешно! Забрано ${formatInt(payout)} ${cfg.currencyName}.`);
+    setBadge('Успех', 'idle');
+    ui.pilot.className = 'pilot state-idle';
+    updateButtons();
+    saveState();
+    tg && tg.HapticFeedback && tg.HapticFeedback.notificationOccurred('success');
+  }
+
+  function crashRound() {
+    if (state.gameState !== 'running') return;
+    cancelAnimationFrame(state.rafId);
+    state.currentMultiplier = Number(state.crashPoint.toFixed(2));
+    ui.multiplier.textContent = `${state.currentMultiplier.toFixed(2)}x`;
+    state.history.unshift(state.currentMultiplier);
+    state.history = state.history.slice(0, cfg.historySize);
+    renderHistory();
+    updateStatusText(`Краш на ${state.currentMultiplier.toFixed(2)}x. Попробуй ещё раз.`);
+    setBadge('Краш', 'idle');
+    updateButtons();
+
+    ui.pilot.className = 'pilot state-fall';
+    const startLeft = parseFloat(ui.pilot.style.left || '80');
+    const startTop = parseFloat(ui.pilot.style.top || '200');
+    const fallTo = ui.scene.clientHeight - 130;
+    const started = performance.now();
+
+    const animateFall = (time) => {
+      const p = clamp((time - started) / 650, 0, 1);
+      ui.pilot.style.left = `${startLeft + p * 90}px`;
+      ui.pilot.style.top = `${startTop + p * (fallTo - startTop)}px`;
+      ui.pilot.style.transform = `rotate(${24 + p * 110}deg) scale(${1 - p * 0.1})`;
+      if (p < 1) {
+        requestAnimationFrame(animateFall);
+      } else {
+        doExplosion(startLeft + 110, fallTo + 28);
+        state.gameState = 'idle';
+        ui.pilot.className = 'pilot state-idle';
+        ui.pilot.style.left = '84px';
+        ui.pilot.style.top = '';
+        ui.pilot.style.bottom = '92px';
+        ui.pilot.style.transform = 'rotate(0deg) scale(1)';
+        updateButtons();
+        saveState();
+      }
+    };
+
+    requestAnimationFrame(animateFall);
+    tg && tg.HapticFeedback && tg.HapticFeedback.notificationOccurred('error');
+  }
+
+  function doExplosion(x, y) {
+    ui.scene.classList.remove('scene-shake');
+    void ui.scene.offsetWidth;
+    ui.scene.classList.add('scene-shake');
+
+    ui.explosion.classList.remove('hidden');
+    ui.explosion.classList.remove('active');
+    ui.explosion.style.left = `${x}px`;
+    ui.explosion.style.top = `${y}px`;
+    void ui.explosion.offsetWidth;
+    ui.explosion.classList.add('active');
+
+    for (let i = 0; i < 18; i++) addSpark(x, y);
+    setTimeout(() => ui.explosion.classList.add('hidden'), 700);
+  }
+
+  function bindEvents() {
+    ui.startBtn.addEventListener('click', startRound);
+    ui.cashoutBtn.addEventListener('click', cashOut);
+    ui.minusBtn.addEventListener('click', () => normalizeBet(state.currentBet - 50));
+    ui.plusBtn.addEventListener('click', () => normalizeBet(state.currentBet + 50));
+    ui.betInput.addEventListener('change', (e) => normalizeBet(e.target.value));
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+      btn.addEventListener('click', () => normalizeBet(btn.dataset.bet));
+    });
+    window.addEventListener('resize', () => {
+      resizeCanvas();
+      drawTrail();
+    });
+  }
+
+  function init() {
+    loadState();
+    if (state.currentBet > state.balance) state.currentBet = Math.min(cfg.defaultBet, state.balance);
+    if (state.currentBet < cfg.minBet) state.currentBet = cfg.minBet;
+    updateBalanceUI();
+    updateBetUI();
+    renderHistory();
+    updateButtons();
+    resizeCanvas();
+    clearTrail();
+    updateStatusText('Нажми «Старт», чтобы начать раунд');
+    setBadge('Ожидание', 'idle');
+    bindEvents();
+  }
+
+  init();
+})();
