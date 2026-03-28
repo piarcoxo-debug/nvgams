@@ -6,7 +6,7 @@ window.NOVA_CONFIG = {
   maxBet: 10000,
   maxCrash: 50,
   historySize: 7,
-  storageKey: 'novarush_v2_state',
+  storageKey: 'novarush_v3_state',
   crashDistribution: [
     { chance: 40, min: 1.0, max: 2.0 },
     { chance: 30, min: 2.01, max: 5.0 },

@@ -14,19 +14,21 @@
 * { box-sizing: border-box; }
 html, body {
   margin: 0;
-  min-height: 100%;
+  height: 100%;
   background: radial-gradient(circle at top, #26106f 0%, var(--bg1) 56%, #04020c 100%);
   color: var(--text);
   font-family: Inter, Arial, sans-serif;
 }
-body { display: flex; justify-content: center; }
+body { display: flex; justify-content: center; overflow: hidden; }
 .app-shell {
   width: min(100vw, 1100px);
-  min-height: 100vh;
-  padding: 10px;
+  height: 100dvh;
+  padding: 8px;
 }
 .game-card {
-  min-height: calc(100vh - 20px);
+  height: calc(100dvh - 16px);
+  display: grid;
+  grid-template-rows: auto 1fr auto;
   border: 1px solid rgba(123,112,255,.3);
   border-radius: 28px;
   overflow: hidden;
@@ -104,7 +106,7 @@ body { display: flex; justify-content: center; }
 .history-high { color: #69ff9a; }
 .scene-wrap {
   position: relative;
-  height: min(58vh, 720px);
+  min-height: 0;
   overflow: hidden;
   background:
     radial-gradient(circle at 50% 8%, rgba(123,112,255,.22), transparent 28%),
@@ -301,24 +303,80 @@ body { display: flex; justify-content: center; }
   60% { transform: translate(-3px,-2px); }
   80% { transform: translate(3px,2px); }
 }
-@media (max-width: 900px) {
-  .topbar { grid-template-columns: 1fr; }
-  .side-panel { grid-template-columns: 1fr 1fr; }
-  .control-bar { grid-template-columns: 1fr; }
-  .action-btn { height: 108px; }
+
+
+
+#betInput {
+  width: 100%;
+  height: 72px;
+  border-radius: 20px;
+  border: 1px solid rgba(131,120,255,.22);
+  background: rgba(34, 22, 86, .86);
+  color: #fff;
+  text-align: center;
+  font-size: 2rem;
+  font-weight: 900;
+  padding: 0 16px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.03);
 }
+
 @media (max-width: 620px) {
-  .app-shell { padding: 0; }
-  .game-card { border-radius: 0; min-height: 100vh; }
-  .topbar { padding: 12px 12px 4px; gap: 10px; }
-  .brand-box, .side-panel > div, .bet-panel, .action-panel { border-radius: 18px; padding: 14px; }
-  .scene-wrap { height: 52vh; }
-  .control-bar { padding: 12px; gap: 12px; }
-  .bet-row { grid-template-columns: 70px 1fr 70px; gap: 8px; }
-  .mini-btn { height: 60px; font-size: 1rem; }
-  #betInput { height: 60px; font-size: 1.7rem; }
-  .bet-presets { grid-template-columns: repeat(3, 1fr); }
-  .action-panel { grid-template-columns: 1fr 1fr; }
-  .action-btn { height: 96px; border-radius: 20px; }
-  .pilot { width: 82px; height: 82px; left: 48px; bottom: 82px; }
+  html, body { height: 100dvh; }
+  .app-shell { padding: 0; height: 100dvh; }
+  .game-card { border-radius: 0; height: 100dvh; grid-template-rows: auto minmax(220px, 1fr) auto; }
+  .topbar {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "brand brand"
+      "center center"
+      "balance history";
+    gap: 8px;
+    padding: 10px;
+  }
+  .brand-box { grid-area: brand; padding: 12px 14px; }
+  .center-readout { grid-area: center; padding: 2px 0 4px; }
+  .side-panel { grid-area: balance / balance / history / history; display: contents; }
+  .balance-box { grid-area: balance; }
+  .history-box { grid-area: history; }
+  .brand { font-size: 1.15rem; }
+  .status-row { margin-top: 10px; gap: 6px; }
+  .badge { padding: 6px 10px; font-size: .82rem; }
+  .multiplier { font-size: clamp(2.3rem, 11vw, 4rem); line-height: 1; }
+  .status-text { font-size: .92rem; min-height: 18px; }
+  .balance-box span, .history-box span { margin-bottom: 6px; font-size: .84rem; }
+  .balance-box strong { font-size: 1.1rem; }
+  .history-list { min-height: 58px; gap: 6px; }
+  .history-item { padding: 6px 8px; font-size: .92rem; }
+  .brand-box, .balance-box, .history-box, .bet-panel, .action-panel { border-radius: 16px; padding: 12px; }
+  .scene-wrap { min-height: 0; }
+  .pilot { width: 74px; height: 74px; left: 34px; bottom: 64px; }
+  .control-bar {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 10px;
+    position: sticky;
+    bottom: 0;
+    backdrop-filter: blur(10px);
+    background: rgba(9, 5, 29, 0.94);
+  }
+  .bet-panel label { font-size: .9rem; display: block; margin-bottom: 6px; }
+  .bet-row { grid-template-columns: 60px 1fr 60px; gap: 8px; }
+  .mini-btn { height: 56px; font-size: .95rem; border-radius: 16px; }
+  #betInput { height: 56px; font-size: 1.45rem; border-radius: 16px; }
+  .bet-presets { grid-template-columns: repeat(5, minmax(0,1fr)); gap: 6px; margin-top: 8px; }
+  .preset-btn { height: 40px; font-size: .88rem; border-radius: 14px; }
+  .action-panel { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .action-btn { height: 72px; border-radius: 18px; font-size: 1.2rem; }
+}
+
+@media (max-width: 390px) {
+  .topbar { padding: 8px; }
+  .brand-box, .balance-box, .history-box, .bet-panel, .action-panel { padding: 10px; }
+  .brand { font-size: 1.05rem; }
+  .multiplier { font-size: 2.2rem; }
+  .status-text { font-size: .84rem; }
+  .bet-row { grid-template-columns: 54px 1fr 54px; }
+  #betInput { font-size: 1.25rem; }
+  .preset-btn { font-size: .8rem; }
+  .action-btn { height: 66px; font-size: 1.05rem; }
 }
