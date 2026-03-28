@@ -15,23 +15,27 @@
     trailCanvas: document.getElementById('trailCanvas')
   };
 
+  const ctx = els.trailCanvas.getContext('2d');
   const state = loadState();
   state.mode = 'idle';
   state.multiplier = 1;
-  state.crashPoint = null;
+  state.crashPoint = 0;
   state.startTime = 0;
-  state.animFrame = 0;
-  state.currentPos = { x: 56, y: 0 };
-  state.explosionAt = null;
+  state.frameId = 0;
+  state.progress = 0;
+  state.currentPos = { x: 0, y: 0 };
 
-  const ctx = els.trailCanvas.getContext('2d');
   resizeCanvas();
-  window.addEventListener('resize', resizeCanvas);
+  window.addEventListener('resize', () => {
+    resizeCanvas();
+    redrawStatic();
+  });
 
   renderQuickButtons();
   normalizeBet();
+  seedHistory();
   renderAll();
-  positionPilot(0, 0);
+  placePilot(0);
   drawTrail(0);
 
   document.querySelectorAll('[data-delta]').forEach(btn => {
@@ -73,7 +77,12 @@
     }));
   }
 
-  function formatBalance(v) {
+  function seedHistory() {
+    if (state.history.length) return;
+    state.history = [1.95, 1.92, 1.45, 1.71, 1.77, 1.88];
+  }
+
+  function formatCoins(v) {
     return `${new Intl.NumberFormat('ru-RU').format(Math.max(0, Math.floor(v)))} ${CFG.currencyName}`;
   }
 
@@ -83,12 +92,11 @@
   }
 
   function normalizeBet() {
+    state.balance = Number.isFinite(state.balance) && state.balance >= 0 ? state.balance : CFG.startBalance;
+    if (state.balance < 50) state.balance = CFG.startBalance;
     state.bet = clampBet(state.bet);
     if (state.bet > state.balance && state.balance >= 50) {
       state.bet = clampBet(Math.floor(state.balance / 50) * 50);
-    }
-    if (state.balance < 50) {
-      state.balance = CFG.startBalance;
     }
     els.betInput.value = state.bet;
     saveState();
@@ -113,19 +121,18 @@
 
   function renderHistory() {
     els.historyStrip.innerHTML = '';
-    const items = state.history.length ? state.history : [1.45, 2.36, 8.72, 1.12, 6.51];
-    items.slice(0, CFG.historySize).forEach(v => {
+    state.history.slice(0, CFG.historySize).forEach(v => {
       const chip = document.createElement('div');
-      chip.className = `history-chip ${v >= 10 ? 'high' : v >= 2 ? 'mid' : 'low'}`;
+      chip.className = `history-chip ${v >= 10 ? 'high' : v >= 2 ? 'mid' : ''}`;
       chip.textContent = `${Number(v).toFixed(2)}x`;
       els.historyStrip.appendChild(chip);
     });
   }
 
   function renderAll() {
-    els.balanceValue.textContent = formatBalance(state.balance);
+    els.balanceValue.textContent = formatCoins(state.balance);
     els.multiplierValue.textContent = `${state.multiplier.toFixed(2)}x`;
-    els.startBtn.disabled = !(state.mode === 'idle' && state.balance >= state.bet && state.bet >= 50);
+    els.startBtn.disabled = !(state.mode === 'idle' && state.balance >= state.bet);
     if (state.mode === 'running') {
       els.cashoutBtn.disabled = false;
       els.cashoutBtn.textContent = `ЗАБРАТЬ ${new Intl.NumberFormat('ru-RU').format(Math.floor(state.bet * state.multiplier))}`;
@@ -143,79 +150,86 @@
     ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
   }
 
-  function pointAt(progress) {
+  function pointAt(t) {
     const rect = els.stage.getBoundingClientRect();
     const w = rect.width;
     const h = rect.height;
-    const start = { x: 18, y: h - 165 };
-    const c1 = { x: w * 0.28, y: h - 168 };
-    const c2 = { x: w * 0.64, y: h - 275 };
-    const end = { x: w - 92, y: 182 };
-    const t = Math.max(0, Math.min(1, progress));
+    const p0 = { x: 8, y: h - 165 };
+    const p1 = { x: w * 0.24, y: h - 165 };
+    const p2 = { x: w * 0.58, y: h - 255 };
+    const p3 = { x: w - 78, y: 180 };
     const mt = 1 - t;
     return {
-      x: mt * mt * mt * start.x + 3 * mt * mt * t * c1.x + 3 * mt * t * t * c2.x + t * t * t * end.x,
-      y: mt * mt * mt * start.y + 3 * mt * mt * t * c1.y + 3 * mt * t * t * c2.y + t * t * t * end.y
+      x: mt * mt * mt * p0.x + 3 * mt * mt * t * p1.x + 3 * mt * t * t * p2.x + t * t * t * p3.x,
+      y: mt * mt * mt * p0.y + 3 * mt * mt * t * p1.y + 3 * mt * t * t * p2.y + t * t * t * p3.y
     };
   }
 
-  function tangentAngle(progress) {
-    const a = pointAt(Math.max(0, progress - 0.01));
-    const b = pointAt(Math.min(1, progress + 0.01));
+  function tangentAngle(t) {
+    const a = pointAt(Math.max(0, t - 0.01));
+    const b = pointAt(Math.min(1, t + 0.01));
     return Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
   }
 
-  function positionPilot(progress, angle) {
+  function placePilot(progress) {
     const p = pointAt(progress);
     state.currentPos = p;
-    els.pilot.style.left = `${p.x - 36}px`;
-    els.pilot.style.top = `${p.y - 28}px`;
-    els.pilot.style.transform = `rotate(${angle}deg)`;
+    els.pilot.style.left = `${p.x - 62}px`;
+    els.pilot.style.top = `${p.y - 62}px`;
+    els.pilot.style.transform = `rotate(${tangentAngle(progress)}deg)`;
   }
 
   function drawTrail(progress) {
     const rect = els.stage.getBoundingClientRect();
     ctx.clearRect(0, 0, rect.width, rect.height);
-    const p0 = pointAt(0);
-    const p1 = pointAt(Math.min(1, progress * 0.45 + 0.08));
-    const p2 = pointAt(Math.min(1, progress * 0.8 + 0.12));
-    const p3 = pointAt(progress);
+
+    const endT = Math.max(0.02, progress);
+    const samples = [];
+    for (let i = 0; i <= 50; i += 1) {
+      samples.push(pointAt(endT * (i / 50)));
+    }
 
     ctx.save();
     ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
 
     ctx.beginPath();
-    ctx.moveTo(p0.x, p0.y);
-    ctx.bezierCurveTo(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y);
-    ctx.strokeStyle = 'rgba(82,235,255,0.18)';
-    ctx.lineWidth = 14;
-    ctx.shadowBlur = 22;
-    ctx.shadowColor = 'rgba(89,228,255,0.55)';
+    ctx.moveTo(samples[0].x, samples[0].y);
+    for (let i = 1; i < samples.length; i += 1) ctx.lineTo(samples[i].x, samples[i].y);
+    ctx.strokeStyle = 'rgba(86, 231, 255, 0.16)';
+    ctx.lineWidth = 18;
+    ctx.shadowBlur = 26;
+    ctx.shadowColor = 'rgba(111, 231, 255, 0.5)';
     ctx.stroke();
 
     ctx.beginPath();
-    ctx.moveTo(p0.x, p0.y);
-    ctx.bezierCurveTo(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y);
-    ctx.strokeStyle = '#8d67ff';
-    ctx.lineWidth = 2;
-    ctx.shadowBlur = 8;
-    ctx.shadowColor = 'rgba(141,103,255,0.8)';
+    ctx.moveTo(samples[0].x, samples[0].y);
+    for (let i = 1; i < samples.length; i += 1) ctx.lineTo(samples[i].x, samples[i].y);
+    ctx.strokeStyle = '#7ecfff';
+    ctx.lineWidth = 3;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = 'rgba(126, 207, 255, 0.8)';
     ctx.stroke();
 
-    for (let i = 0; i < 26; i++) {
-      const t = progress * (i / 25);
-      const p = pointAt(t);
-      const size = 1.2 + (i % 4 === 0 ? 1.2 : 0);
-      ctx.fillStyle = i % 3 === 0 ? 'rgba(255,147,223,0.9)' : 'rgba(114,228,255,0.85)';
+    for (let i = 0; i < samples.length; i += 1) {
+      if (i % 4 !== 0) continue;
+      const p = samples[i];
+      ctx.fillStyle = i % 8 === 0 ? 'rgba(255, 148, 223, 0.88)' : 'rgba(111, 231, 255, 0.84)';
       ctx.beginPath();
-      ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, 1.7, 0, Math.PI * 2);
       ctx.fill();
     }
+
     ctx.restore();
   }
 
-  function crashPoint() {
-    const total = CFG.crashRanges.reduce((s, r) => s + r.weight, 0);
+  function redrawStatic() {
+    drawTrail(state.mode === 'running' ? state.progress : 0);
+    if (state.mode !== 'crashed') placePilot(state.mode === 'running' ? state.progress : 0);
+  }
+
+  function generateCrashPoint() {
+    const total = CFG.crashRanges.reduce((sum, r) => sum + r.weight, 0);
     let roll = Math.random() * total;
     for (const r of CFG.crashRanges) {
       roll -= r.weight;
@@ -227,16 +241,18 @@
   function startRound() {
     if (state.mode !== 'idle') return;
     normalizeBet();
-    if (state.balance < state.bet || state.bet < 50) return;
+    if (state.balance < state.bet) return;
     state.balance -= state.bet;
     state.mode = 'running';
     state.multiplier = 1;
-    state.crashPoint = crashPoint();
+    state.progress = 0;
+    state.crashPoint = generateCrashPoint();
     state.startTime = performance.now();
     els.explosion.classList.add('hidden');
     els.pilot.classList.remove('hidden');
-    cancelAnimationFrame(state.animFrame);
+    saveState();
     renderAll();
+    cancelAnimationFrame(state.frameId);
     tick();
   }
 
@@ -253,12 +269,11 @@
 
   function triggerCrash() {
     state.mode = 'crashed';
+    state.multiplier = state.crashPoint;
     state.history.unshift(state.crashPoint);
     state.history = state.history.slice(0, CFG.historySize);
-    state.multiplier = state.crashPoint;
-    state.explosionAt = { ...state.currentPos };
-    els.explosion.style.left = `${state.explosionAt.x + 8}px`;
-    els.explosion.style.top = `${state.explosionAt.y + 18}px`;
+    els.explosion.style.left = `${state.currentPos.x + 8}px`;
+    els.explosion.style.top = `${state.currentPos.y + 6}px`;
     els.explosion.classList.remove('hidden');
     els.pilot.classList.add('hidden');
     saveState();
@@ -266,22 +281,27 @@
     setTimeout(() => {
       els.explosion.classList.add('hidden');
       state.mode = 'idle';
+      state.multiplier = 1;
+      state.progress = 0;
+      drawTrail(0);
+      placePilot(0);
+      els.pilot.classList.remove('hidden');
       renderAll();
-    }, 360);
+    }, 380);
   }
 
   function tick() {
     const elapsed = (performance.now() - state.startTime) / 1000;
-    state.multiplier = Math.min(CFG.maxCrash, Number((Math.exp(elapsed * 0.33)).toFixed(2)));
-    const progress = Math.min(1, Math.log(state.multiplier) / Math.log(CFG.maxCrash));
-    drawTrail(progress);
-    positionPilot(progress, tangentAngle(progress) + 2);
+    state.multiplier = Math.min(CFG.maxCrash, Number((Math.exp(elapsed * 0.34)).toFixed(2)));
+    state.progress = Math.min(1, Math.log(state.multiplier) / Math.log(CFG.maxCrash));
+    drawTrail(state.progress);
+    placePilot(state.progress);
     renderAll();
 
     if (state.multiplier >= state.crashPoint) {
       triggerCrash();
       return;
     }
-    state.animFrame = requestAnimationFrame(tick);
+    state.frameId = requestAnimationFrame(tick);
   }
 })();
